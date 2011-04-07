@@ -1,0 +1,111 @@
+#!/usr/bin/env perl
+
+use strict;
+use feature 'say';
+use Term::ReadLine;
+use Term::ReadLine::Gnu;
+use Cwd;
+
+print "\n  The Perl Shell\n\n";
+
+my $term = Term::ReadLine->new("Perl SHell");
+$term->ornaments(0);
+my $OUT = $term->OUT || \*STDOUT;
+
+my @paths = split(':', $ENV{PATH});
+my $path = "";
+my $nl = "";
+my %memory;
+my $pwd = getcwd;
+my $dpwd = get_dpwd($pwd);
+
+while (defined($_ = $term->readline("psh\@$dpwd> ")))
+{
+	my $res;
+
+	# transform variables
+	s/§(\w+)/\$memory{$1}/g;
+
+	# quote paths
+	s/cd (\S+)\/?/cd \"$1\"/g;
+
+	/^(\S+)/;
+	if (-x $1) {
+		system;
+		$nl = "";
+	}
+	elsif (find_exec($1)) {
+		system "$path/$_";
+		$nl = "";
+	}
+	else {
+		$res = eval($_);
+		$nl = "\n";
+	}
+
+	if ($@) { warn $@; $@ = ""; }
+	else { print $OUT $res, $nl; }
+
+	$term->addhistory($_) if /\S/;
+}
+
+# Find the right path for a program name
+sub find_exec
+{
+	my $prog = shift;
+
+	foreach my $p (@paths) {
+		if (-x "$p/$prog") {
+			$path = $p;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+# builtins ###
+
+sub var
+{
+	my $name = shift;
+	my $value = shift;
+
+	$memory{$name} = $value;
+}
+
+sub dumpvar
+{
+	foreach my $key (sort keys %memory) {
+		say "$key = $memory{$key}";
+	}
+}
+
+sub cd
+{
+	my $path = shift;
+
+	if ($path =~ /\.\./) {
+		$pwd =~ s/\w*$//;
+		$path = $pwd;
+	}
+
+	chdir($path);
+	$pwd = getcwd;
+	$dpwd = get_dpwd($pwd);
+}
+
+sub get_dpwd
+{
+	my $path = shift;
+	my $home = $ENV{HOME};
+
+	$path =~ s/$home/~/;
+	return $path;
+}
+
+sub q
+{
+	exit 0;
+}
+
+

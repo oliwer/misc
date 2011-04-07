@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ -z $1 ] && exit 1
+
+file-roller --extract-here "$1"
+
+xmessage -buttons Yes:22,No:44 -default Yes -nearmouse "Remove this archive ?"
+
+[ $? -eq 22 ] && rm "$1"
+

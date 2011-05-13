@@ -4,9 +4,6 @@
 
 # This script has been designed to work with Nautilus or Rox-Filer.
 # It can also be used from command line.
-# If you use it with Nautilus, beware that it only works with local files.
-
-set -e
 
 test_bin() {
 	if [ -z $(which $1) ]; then
@@ -16,23 +13,37 @@ test_bin() {
 	fi
 }
 
-INPUT="$1"
+extract_gvfs() {
+	file-roller --extract-here "$1"
+
+	zenity --question --text="Do you want to remove "$(basename "$1")" ?"
+		
+	[ $? -eq 0 ] && gvfs-rm -f "$1"
+}
+
+extract_rm() {
+	file-roller --extract-here "$1"
+
+	# Zenity can be a little slow to start, so we use xmessage instead.
+	xmessage -buttons Yes:0,No:2 -default Yes -nearmouse \
+		"Do you want to remove "$(basename "$1")" ?"
+
+	[ $? -eq 0 ] && rm -f "$1"
+}
+
+test_bin file-roller
+
 PARENT=$(ps -p $PPID -o comm=)
 
 if [ $PARENT = "nautilus" ]; then
-	INPUT="$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS"
+	test_bin gvfs-rm
+	test_bin zenity
+	for F in $NAUTILUS_SCRIPT_SELECTED_URIS; do
+		extract_gvfs "$F"
+	done
+else
+	test_bin xmessage
+	for F in "$@"; do
+		extract_rm "$F"
+	done
 fi
-
-[ -z $INPUT ] && exit 1
-
-test_bin file-roller
-test_bin xmessage
-
-file-roller --extract-here "$INPUT"
-
-# Zenity can be a little slow to start, so we use xmessage instead.
-xmessage -buttons Yes:22,No:44 -default Yes -nearmouse \
-	"Do you want to remove "$(basename "$INPUT")" ?"
-
-[ $? -eq 22 ] && rm -f "$INPUT"
-
